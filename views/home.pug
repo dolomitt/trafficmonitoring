@@ -1,0 +1,120 @@
+extends maps_layout
+
+block header
+  style.
+    #map {
+      height: 100%;
+    }
+    /* Optional: Makes the sample page fill the window. */
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+block content
+  #map
+  script(type="text/javascript").
+    var myLatLng = {lat: 	3.360, lng: 103.820};
+    var zoomLevel = 12;
+
+    function Start() {
+      if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(function(position) {
+            var pos = {
+              lat: position.coords.latitude,
+              lng: position.coords.longitude
+            };
+
+            myLatLng = pos;
+            initMap();
+
+          }, function() {
+            initMap();
+          });
+        }
+        else {
+         // Browser doesn't support Geolocation
+          initMap();
+        }
+    }
+
+    function initMap() {
+      var previousLocation = JSON.parse(localStorage.getItem("lastPosition"));
+      var previousZoom =  JSON.parse(localStorage.getItem("lastZoom"));
+
+      console.log(previousLocation);
+
+      if (previousLocation === null) {
+        localStorage.setItem('lastPosition', JSON.stringify(myLatLng));
+      }
+      else {
+        myLatLng = previousLocation;
+      }
+
+      if (previousZoom === null) {
+        localStorage.setItem('lastZoom', JSON.stringify(zoomLevel));
+      }
+      else {
+        zoomLevel = previousZoom;
+      }
+
+      // Create a map object and specify the DOM element for display.
+      var map = new google.maps.Map(document.getElementById('map'), {
+        center: myLatLng,
+        scrollwheel: true,
+        zoom: zoomLevel
+      });
+
+      var infowindow = new google.maps.InfoWindow({
+        content: 'Some info'
+      });
+
+      map.addListener('center_changed', function() {
+        // 3 seconds after the center of the map has changed, pan back to the
+        // marker.
+        var latlng = map.getCenter();
+        localStorage.setItem('lastPosition', JSON.stringify(latlng));
+      });
+
+      map.addListener('zoom_changed', function() {
+        // 3 seconds after the center of the map has changed, pan back to the
+        // marker.
+        var zoomLevel = map.getZoom();
+        localStorage.setItem('lastZoom', JSON.stringify(zoomLevel));
+      });
+
+      $.ajax({ url: "/snapshot/index" }).then(function(data) {
+         for(var i = 0; i < data.length; i++) {
+           var item = data[i];
+
+           // Create a marker and set its position.
+           var marker = new google.maps.Marker({
+             map: map,
+             position: {lat: 	item.location.coordinates[1], lng: item.location.coordinates[0]},
+             title: 'Camera #' + item.camera_id,
+             image : '/images/' + item.camera_id + '/' + item.filename,
+             timestamp : item.timestamp,
+             icon: '/img/security-camera-icon.png'
+           });
+
+           marker.addListener('mouseover', function() {
+             infowindow.setContent('<span>' + this.timestamp + '</span><br/><img width="320px" height="240px" src="' + this.image + '"/>');
+             infowindow.open(map, this);
+          });
+
+          marker.addListener('click', function() {
+            window.open(this.image);
+         });
+
+          marker.addListener('mouseout', function() {
+            infowindow.close();
+          });
+         };
+      });
+    }
+
+    function handleLocationError(browserHasGeolocation, infoWindow, pos) {
+      console.log('No geolocation');
+    }
+block pagefooter
+  script(type="text/javascript",src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDOdS_dzG7_NcZpJuty2rRZp9GdJYpZMSc&callback=Start",async,defer)
